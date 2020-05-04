@@ -4,11 +4,392 @@ import rospy
 # from geometry_msgs.msg import Twist
 from std_msgs.msg import Float64
 from mpmath import *
+import os
+import cv2
+import math
+import random
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.interpolate import CubicSpline
+from scipy.interpolate import splprep, splev, splrep 
+import time
+
+plt.ion()
+
+class RRTStar:
+    class node:
+        def __init__(self, x, y, theta = 0, t=0, cost = 0):
+            self.x = x
+            self.y = y
+            self.t = t
+            self.theta = theta
+            self.parent = None
+            # self.children = []    
+            self.x_path = None
+            self.y_path = None
+            self.theta_path = None
+            self.cost = cost
+
+    def create_world(self):
+        im = cv2.imread('/home/manika/car_ws/src/toycar/nodes/map2.png')
+        cur_path = os.path.dirname(os.path.abspath(__file__))
+        # print(cur_path)
+
+        # if im == None:
+        #     print("dfhisodjfo")
+
+        imgray = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
+        ret, thresh = cv2.threshold(imgray, 200, 255, 0)
+        # world = thresh
+
+        kernel = np.ones((3, 3),np.uint8)
+        world = cv2.erode(thresh, kernel,iterations = 1)
+        # print(world.shape)
+        # print(world)
+
+        # cv2.imshow("map", world)
+        # if cv2.waitKey(0) & 0xff == 0:
+        #     cv2.destroyAllWindows()
+        
+        # world = np.ones((1000, 1000))
+
+        # for i in range(30, 720):
+        #     for j in range(160, 240):
+        #         world[i][j] = 0
+
+        # for i in range(130, 920):
+        #     for j in range(760, 840):
+        #         world[i][j] = 0
+
+        # cv2.imshow("world", world*255)
+        # if cv2.waitKey(0) & 0xff == 27:
+        #     cv2.destroyAllWindows()
+
+        return world
+
+    def __init__(self, start, goal ):
+        self.start_node = self.node(start[0], start[1], t=0)
+        self.goal_node = self.node(goal[0], goal[1])
+        self.nodes = [self.start_node]
+        self.lower_lim_x = -50
+        self.lower_lim_y = -50
+        self.upper_lim_x = 50
+        self.upper_lim_y = 50 
+        self.neigh_dist = 6
+        # self.vel = 3  # robot speed 
+        self.r = 0.4826 # robot radius
+        self.c = 1      # robot clearance
+        self.thresh = self.c + self.r
+        self.world = self.create_world()
+
+    def check_collision(self, node):
+        ''' No obstacles right now'''
+        ret = False
+        if node.x - self.thresh < self.lower_lim_x:
+            ret = True
+        if node.x + self.thresh > self.upper_lim_x:
+            ret = True
+        if node.y - self.thresh < self.lower_lim_y:
+            ret = True
+        if node.y + self.thresh > self.upper_lim_y:
+            ret = True
+
+        map_idx_x = int(10*node.x)+500
+        map_idx_y = 1000-(int(10*node.y)+500)
+
+        if map_idx_x < 0 or map_idx_x >=1000 or map_idx_y < 0 or map_idx_y >= 1000:
+            # print("Array index out of bound")
+            return True
+
+        if self.world[map_idx_y][map_idx_x] == 0:
+            # print("Collision Detected!!!!!")
+            ret = True
+
+        return ret
+
+    def goal_check(self, node):
+        if self.get_dist(node, self.goal_node) < 5:
+            return True
+
+        return False
+
+    def get_random_node(self):
+        x = random.randint(-49, 50)
+        y = random.randint(-49, 50)
+
+        new_node = self.node(x, y)
+
+        if self.check_collision(new_node):
+            return None
+
+        return new_node
+
+    def get_dist(self, node1, node2):
+        return math.sqrt((node1.x -node2.x)**2 + (node1.y - node2.y)**2)
+
+    def get_nearest_node(self, rand_node, nodes):
+        nearest_node_idx = -1
+        min_dist = float('inf')
+
+        for i, node in enumerate(nodes):
+            dist = self.get_dist(rand_node, node)
+            if dist < min_dist:
+            # print("xxxxxxxxxxxxxxxxxxx")
+            # print(rand_node.theta)
+            # print("yyyyyyyyyyyyyyyyyyy")
+            # print(node.theta)
+            # if dist < min_dist and abs(rand_node.theta - node.theta) <= 0.5:
+                nearest_node_idx = i
+                min_dist = dist
+
+        return nearest_node_idx
+
+    def step_ahead(self, parent, dest_node):
+        par_x = parent.x
+        par_y = parent.y
+        # print(par_x, par_y)
+        t = parent.t
+        # print("t: ", t)
+        # t = t+10
+
+        dest_x = dest_node.x
+        dest_y = dest_node.y
+
+        alpha = np.arctan2((dest_y-par_y), (dest_x-par_x))
+
+        count = 0
+        x_path = [par_x]
+        y_path = [par_y]
+        x = par_x
+        y = par_y
+        dist = 0
+
+        while(count < 10): 
+            dx = 0.2 * math.cos(alpha)
+            dy = 0.2 * math.sin(alpha)
+            x = x + dx
+            y = y + dy
+
+            dist = dist + np.sqrt(dx**2 + dy**2)
+            
+            if self.check_collision(self.node(x, y)):
+                return None
+
+            x_path.append(x)
+            y_path.append(y)
+            count = count + 1
+
+        new_node = self.node(x, y, alpha, t=(t+10))
+        new_node.parent = parent
+        # parent.children.append()
+        new_node.x_path = x_path
+        new_node.y_path = y_path
+        new_node.theta_path = [alpha] * len(x_path)
+        new_node.cost = parent.cost + dist
+
+        return new_node   
+
+    def get_path(self, parent, child):
+        dist = self.get_dist(parent, child)
+
+        if dist % 0.2 == 0:
+            max_count = dist/0.2
+        else:
+            max_count = dist/0.2 + 1
+
+        par_x = parent.x
+        par_y = parent.y
+
+        child_x = child.x
+        child_y = child.y
+
+        alpha = np.arctan2((child_y-par_y), (child_x-par_x))
+
+        count = 0
+        x_path = [par_x]
+        y_path = [par_y]
+        x = par_x
+        y = par_y
+        dist = 0
+
+        while(count < max_count): 
+            dx = 0.2 * math.cos(alpha)
+            dy = 0.2 * math.sin(alpha)
+            x = x + dx
+            y = y + dy
+
+            dist = dist + np.sqrt(dx**2 + dy**2)
+            
+            if self.check_collision(self.node(x, y)):
+                return None, None, None
+
+            x_path.append(x)
+            y_path.append(y)
+            count = count + 1
+
+        return x_path, y_path, [alpha] * len(x_path)
+
+    def get_neighbours(self, new_node):
+        ngh_indx = []
+
+        for i, node in enumerate(self.nodes):
+            dist = self.get_dist(new_node, node)
+            if dist <= self.neigh_dist:
+            # print("xxxxxxxxxxxxxxxxxxx")
+            # print(new_node.theta)
+            # print("yyyyyyyyyyyyyyyyyyy")
+            # print(node.theta)
+            # if dist <= 10 and abs(new_node.theta - node.theta) <= 0.5:
+                ngh_indx.append(i)
+
+        return ngh_indx
+
+    def set_parent(self, new_node, ngh_indx):
+        for i in ngh_indx:
+            dist = self.get_dist(new_node, self.nodes[i])
+            if self.nodes[i].cost + dist < new_node.cost:
+                x_path, y_path, theta_path = self.get_path(self.nodes[i], new_node)
+                if x_path == None:
+                    continue
+                new_node.t = self.nodes[i].t + len(x_path) - 1
+                new_node.x_path = x_path
+                new_node.y_path = y_path
+                new_node.theta = theta_path[0]
+                new_node.theta_path = theta_path
+                new_node.cost = self.nodes[i].cost + dist
+                new_node.parent = self.nodes[i]
+                # self.propagate_cost_to_leaves(new_node)
+
+    def propagate_cost_to_leaves(self, parent):
+        for node in self.nodes:
+            if node.parent == parent:
+                dist = self.get_dist(parent, node)
+                node.cost = parent.cost + dist
+                self.propagate_cost_to_leaves(self.node)
+
+    def rewire(self, new_node, ngh_indx):
+        new_path_x = []
+        new_path_y = []
+
+        for i in ngh_indx:
+            dist = self.get_dist(new_node, self.nodes[i])
+            if new_node.cost + dist < self.nodes[i].cost:
+                x_path, y_path, theta_path = self.get_path(new_node, self.nodes[i])
+                if x_path == None:
+                    continue
+                new_node.t = self.nodes[i].t + len(x_path) - 1
+                self.nodes[i].x_path = x_path
+                self.nodes[i].y_path = y_path
+                self.nodes[i].theta = theta_path[0]
+                self.nodes[i].theta_path = theta_path
+                self.nodes[i].cost = new_node.cost + dist
+                self.nodes[i].parent = new_node
+                self.propagate_cost_to_leaves(self.nodes[i])
+                new_path_x.append(x_path)
+                new_path_y.append(y_path)
+
+        return new_path_x, new_path_y
 
 
-path = [[0,3], [0,4], [0, 4], [0,2]]
+    def plan(self):
+        if self.check_collision(self.start_node):
+            print("Start node inside obstacle")
+            exit()
+
+        if self.check_collision(self.goal_node):
+            print("Goal node inside obstacle")
+            exit()
+
+        fig = plt.figure()
+        ax = fig.gca()
+        # ax.axis('equal')
+        ax.set_xlim([-50,50])
+        ax.set_ylim([-50,50])
+
+        # plt.imshow(self.world)
+
+        cir_start = plt.Circle((self.start_node.x, self.start_node.y), 1, fill=True, color = 'b')
+        cir_goal = plt.Circle((self.goal_node.x, self.goal_node.y), 1, fill=True, color = 'b')
+
+        # points1 = [[-45, 20, 20, -45, -45], [-28, -28, -32, -32, -28]] # -28], [30, -28], [30, -32], [-45, -28]]
+        # points2 = [[-35, 40, 40, -35, -35], [32, 32, 28, 28, 32]] # [[-35, 32], [40, 32], [40, 28], [-35, 28]]
+
+        # # for i in range (4):
+        # #     print(points1[i])
+        # plt.plot( points1[0], points1[1], color='m', linewidth=1)
+        # plt.plot( points2[0], points2[1], color='k', linewidth=1)   
+
+        ax.add_patch(cir_start)
+        ax.add_patch(cir_goal)
+
+        count = 1
+
+        while (True):
+            # print(count)
+            count = count + 1   
+            rand_node = self.get_random_node()
+            if rand_node == None:
+                # print("Could not find random node")
+                continue
+
+            # plt.pause(1)
+
+            # print("Found random node")
+
+            nearest_node_idx = self.get_nearest_node(rand_node, self.nodes)
+            if nearest_node_idx == -1:
+                # print("No nearest neighbour found")
+                continue
+            # print("Found nearest neighbour", nearest_node_idx)
+            new_node = self.step_ahead(self.nodes[nearest_node_idx], rand_node)
+
+            # if collision detected, continue
+            if new_node == None:
+                # print("No safe passage")
+                continue
+
+            # print("Save passage found")
+
+            self.nodes.append(new_node)
+            ngh_indx = self.get_neighbours(new_node)
+            self.set_parent(new_node, ngh_indx)
+            new_path_x, new_path_y = self.rewire(new_node, ngh_indx)
+            # draw_explored(new_node)
+
+            cir_node = plt.Circle((new_node.x, new_node.y), 0.2, fill=True, color = 'r')
+            ax.add_patch(cir_node)
+            plt.plot(new_node.x_path, new_node.y_path, color = 'g', linewidth = 1)
+
+            for i in range(len(new_path_x)):
+                plt.plot(new_path_x[i], new_path_y[i], color = 'g', linewidth = 1)
+
+            # plt.pause(1)
+            plt.pause(0.01)            
+
+            if self.goal_check(new_node):
+                print("Goal reached")
+                break
+
+        return new_node
+
+    def backtrace(self, cur_node):
+        if(cur_node.parent == None):
+            return np.asarray([cur_node.x]), np.asarray([cur_node.y]), np.asarray([cur_node.t]), np.asarray([]), np.asarray([]), np.asarray([])
+
+        x_s, y_s, theta_s, path_x, path_y, path_theta = self.backtrace(cur_node.parent)
+
+        x_s = np.hstack((x_s, cur_node.x))
+        y_s = np.hstack((y_s, cur_node.y))
+        theta_s = np.hstack((theta_s, cur_node.t))
+        path_x = np.hstack((path_x, cur_node.x_path))
+        path_y = np.hstack((path_y, cur_node.y_path))
+        path_theta = np.hstack((path_theta, cur_node.theta_path))
+
+        return x_s, y_s, theta_s, path_x, path_y, path_theta
+
 
 def ros_pub(path):
+    # print("hiiiiiiiiiiiiiiii")
     # pass
     rospy.init_node('toycar', anonymous=True)
     eff_r = rospy.Publisher('/MYROBOT/effort_right/command', Float64, queue_size=100)
@@ -35,13 +416,14 @@ def ros_pub(path):
 
     c = 0
     r = rospy.Rate(10)
-    rospy.sleep(2)
+    # rospy.sleep(2)
+    print(path.shape)
+
 
     for p in path:
-    #     # print("iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii", i)
         while not rospy.is_shutdown():
-            if c== 101:
-                print("yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy")
+            if c== 11:
+                # print("yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy")
                 msg1.data = 0
                 msg2.data = 0
                 msg3.data = 0
@@ -50,8 +432,7 @@ def ros_pub(path):
                 vel.publish(msg3)
                 break
             else:
-                print("xxxxxxxxxxxxxxxxxxxxxxxxxxxx")
-
+                # print("xxxxxxxxxxxxxxxxxxxxxxxxxxxx")
                 if p[0] == 0:
                     theta_l =0
                     theta_r = 0
@@ -69,8 +450,117 @@ def ros_pub(path):
                 r.sleep()
         c=0
 
+def main():
+    # starting position (x, y)
+    start_time = time.time()
+    start = [-40, -40]
+    # start_node = node(start[0], start[1])
+
+    # goal point (x, y)
+    goal = [40, 40]
+    # goal_node = node(goal[0], goal[1])
+
+    rrt_star = RRTStar(start, goal)
+    res = rrt_star.plan()
+
+    tim= res.t
+
+    # backtrace path 
+    x_s, y_s, t_s, path_x, path_y, theta = rrt_star.backtrace(res)
+    path_x = np.asarray(path_x)
+    # print(time)
+    # print(len(x_s))
+    
+
+    # in_x = min(x_s)
+    # max_x = max(x_s)
+    # spl = splrep(x_s, y_s)
+    # x2 = np.linspace(min_x, max_x, 1)
+    # y2 = splev(x2, spl)
+
+    step = float(1/float(tim))
+    # print(step)
+
+    tck, u = splprep([x_s, y_s], s=1)
+    # print(len(tck[0]))
+    u_s = np.arange(0, 1.01, step)
+    new_points = splev(u_s, tck)
+    der_points = splev(u_s, tck, der=1)
+    new_points = np.asarray(new_points)
+    # print(new_points)
+
+    # print(der_points)
+
+    plt.plot(x_s, y_s, color = 'r', linewidth = 1.5)
+
+    plt.plot(new_points[0], new_points[1], label="S", linewidth = 3)
+    # plt.plot(new_points[0], new_points[1], 'ro')
+
+    dist = []
+    alpha = []
+    for i in range(len(new_points[0])):
+        if i == 0:
+            x_pre = new_points[0][i]
+            y_pre = new_points[1][i]
+            a_pre = np.arctan2(der_points[0][i]/der_points[1][i], 1)
+            continue
+
+        x = new_points[0][i]
+        y = new_points[1][i]
+
+        d = np.sqrt((y - y_pre)**2 + (x - x_pre)**2)
+        dist.append(d)
+
+        x_pre = x
+        y_pre = y
+
+        a = np.arctan2(der_points[0][i]/der_points[1][i], 1)
+        alpha.append(a-a_pre)
+        a_pre = a
+
+    # print(len(dist))
+    # print(len(alpha))
+    # print(np.mean(dist))
+    # print(np.std(dist))
+
+    # print(time)
+    # print(u_s * time)
+    alpha = np.asarray(alpha)
+    dist = np.asarray(dist)
+
+
+    out = np.vstack((alpha, 10*dist)).T
+
+    if os.path.exists("/home/manika/car_ws/src/toycar/nodes/out.txt"):
+        os.remove("/home/manika/car_ws/src/toycar/nodes/out.txt")
+    f1 = open("/home/manika/car_ws/src/toycar/nodes/out.txt", "a")
+
+    # if os.path.exists("angle.txt"):
+    #     os.remove("angle.txt")
+    # f2 = open("angle.txt", "a")
+
+    for i in range(len(dist)):
+        np.savetxt(f1, out[i], fmt="%s", newline=' ')
+        f1.write("\n")
+        # np.savetxt(f2, dist, fmt="%s", newline=' ')
+        # f2.write("\n") 
+
+    end_time = time.time()
+    print("start point: ", start)
+    print("goal point: ", goal)
+    print("Time taken to find the path: ", abs(end_time-start_time))
+    plt.show()
+    plt.pause(5)
+    plt.close()
+    ros_pub(out)
+
+
+# path = [[0,3], [0,4], [0, 4], [0,2]]
+
+
+
 if __name__ == '__main__':
-    ros_pub(path)
+    main()
 
 
 
