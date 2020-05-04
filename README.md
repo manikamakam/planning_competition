@@ -33,6 +33,10 @@ roslaunch toycar gazebo.launch
 
 ## Output
 
+Default inputs: 
+start point = ()
+goal point = ()
+
 The time taken by the algorithm to find the shortest path for default inputs is approximately 9 seconds.
 The time taken for simulation in gazebo is approximately 6 minutes
 
