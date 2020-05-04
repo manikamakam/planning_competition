@@ -20,6 +20,7 @@ Clone the repository and run the following commands.
 $ cd ~/car_ws/
 $ catkin_make
 ```
+The paths at line number 34, 534,535,536 in '/car_ws/src/toycar/nodes/path' script should be changed accordingly.
  
 ## Instructions to run
 
@@ -34,13 +35,14 @@ roslaunch toycar gazebo.launch
 ## Output
 
 Default inputs: 
-start point = ()
-goal point = ()
+start point = (-40,-40)
+goal point = (40,40)
 
-The time taken by the algorithm to find the shortest path for default inputs is approximately 9 seconds.
-The time taken for simulation in gazebo is approximately 6 minutes
+The time taken by the algorithm to find the shortest path for default inputs is approximately 1080 seconds.
 
-Text file named 'out.txt' has the velocity and angle values for every 2 seconds in the found path.
+Text file named '/car_ws/src/toycar/nodes/out.txt' has the velocity and angle values for every 2 seconds in the found path.
+
+The simulation in gazebo is not happening because the robot keeps moving after spawning even before any commands are published.
 
 The video outputs for mapping and gazebo simulations can be accessed here:
 https://drive.google.com/drive/folders/1fYV4hsWwIBJ-xjOQIRJUfpZ3mbKkyeuM?usp=sharing
