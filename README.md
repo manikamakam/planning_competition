@@ -17,7 +17,7 @@ source ~/car_ws/devel/setup.bash
 Clone the repository and run the following commands.
 
 ```
-$ cd ~/catkin_ws/
+$ cd ~/car_ws/
 $ catkin_make
 ```
  
