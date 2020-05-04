@@ -1,0 +1,125 @@
+#!/usr/bin/env python2
+
+import rospy
+# from geometry_msgs.msg import Twist
+from std_msgs.msg import Float64
+from mpmath import *
+
+
+path = [[0,3], [0,4], [0, 4], [0,2]]
+
+def ros_pub(path):
+    # pass
+    rospy.init_node('toycar', anonymous=True)
+    eff_r = rospy.Publisher('/MYROBOT/effort_right/command', Float64, queue_size=100)
+    msg1 = Float64()
+
+    eff_l = rospy.Publisher('/MYROBOT/effort_left/command', Float64, queue_size=100)
+    msg2 = Float64()
+
+    vel = rospy.Publisher('/MYROBOT/vel_rear/command', Float64, queue_size=100)
+    msg3 = Float64()
+
+
+
+    # turtlebot3_model = rospy.get_param("model", "burger")
+
+    msg1.data = 0
+    msg2.data = 0
+    msg3.data = 0
+
+
+    eff_r.publish(msg1)
+    eff_l.publish(msg2)
+    vel.publish(msg3)
+
+    c = 0
+    r = rospy.Rate(10)
+    rospy.sleep(2)
+
+    for p in path:
+    #     # print("iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii", i)
+        while not rospy.is_shutdown():
+            if c== 101:
+                print("yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy")
+                msg1.data = 0
+                msg2.data = 0
+                msg3.data = 0
+                eff_r.publish(msg1)
+                eff_l.publish(msg2)
+                vel.publish(msg3)
+                break
+            else:
+                print("xxxxxxxxxxxxxxxxxxxxxxxxxxxx")
+
+                if p[0] == 0:
+                    theta_l =0
+                    theta_r = 0
+                else:
+                    theta_l = acot(cot(p[0]) + (0.26315789))
+                    theta_r = acot(cot(p[0]) - (0.26315789))
+                    
+                msg1.data = theta_r
+                msg2.data = theta_l
+                msg3.data = p[1]
+                eff_r.publish(msg1)
+                eff_l.publish(msg2)
+                vel.publish(msg3)
+                c=c+1
+                r.sleep()
+        c=0
+
+if __name__ == '__main__':
+    ros_pub(path)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  

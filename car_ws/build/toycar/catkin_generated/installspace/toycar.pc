@@ -1,0 +1,8 @@
+prefix=/home/manika/car_ws/install
+
+Name: toycar
+Description: Description of toycar
+Version: 1.0.0
+Cflags: 
+Libs: -L${prefix}/lib 
+Requires: 

@@ -1,0 +1,33 @@
+MYROBOT:
+  # Publish all joint states -----------------------------------
+  joint_state_controller:
+    type: joint_state_controller/JointStateController
+    publish_rate: 50  
+
+  # Position Controllers ---------------------------------------
+  effort_left:
+    type: effort_controllers/JointPositionController
+    joint: left_frontaxisjoint
+    pid: {p: 100.0, i: 0.01, d: 10.0}
+  effort_right:
+    type: effort_controllers/JointPositionController
+    joint: right_frontaxisjoint
+    pid: {p: 100.0, i: 0.01, d: 10.0}
+
+  vel_rear:
+    type: velocity_controllers/JointVelocityController
+    joint: rearwheelsjoints
+    pid: {p: 100.0, i: 0.01, d: 10.0}
+
+
+  # Velocity Controllers
+  # velocity_left:
+  #   type: velocity_controllers/JointVelocityController
+  #   joint: FrontLeftWheelJoint
+  #   pid: {p: 100.0, i: 0.01, d: 10.0}
+
+  # velocity_right:
+  #   type: velocity_controllers/JointVelocityController
+  #   joint: FrontRightWheelJoint
+  #   pid: {p: 100.0, i: 0.01, d: 10.0}
+  

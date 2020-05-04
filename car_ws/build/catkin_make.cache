@@ -1,0 +1,2 @@
+robot_control:toycar
+-DCATKIN_DEVEL_PREFIX=/home/manika/car_ws/devel -DCMAKE_INSTALL_PREFIX=/home/manika/car_ws/install -G Unix Makefiles
