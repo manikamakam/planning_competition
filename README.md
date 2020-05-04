@@ -43,5 +43,5 @@ The time taken for simulation in gazebo is approximately 6 minutes
 Text file named 'out.txt' has the velocity and angle values for every 2 seconds in the found path.
 
 The video outputs for mapping and gazebo simulations can be accessed here:
-https://drive.google.com/drive/folders/1AgRXgyogmuREwNg90ecDwI6LoKeRHZlb?usp=sharing
+https://drive.google.com/drive/folders/1fYV4hsWwIBJ-xjOQIRJUfpZ3mbKkyeuM?usp=sharing
 
